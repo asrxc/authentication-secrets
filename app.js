@@ -4,7 +4,8 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+const bcrypt = require("bcryptjs");
+const saltRounds = 10;
 
 const app = express();
 
@@ -19,7 +20,6 @@ const userSchema = new mongoose.Schema({
     password: String
 });
 
-userSchema.plugin(encrypt,{secret: process.env.SECRET, encryptedFields:['password']});
 
 const User = new mongoose.model("User", userSchema);
 
@@ -28,8 +28,8 @@ app.route("/")
     {res.render("home");}
 });
 
-app.route("/login")
 
+app.route("/login")
 .get(function(req,res){{
     res.render("login");
 }})
@@ -42,55 +42,46 @@ app.route("/login")
             console.log(err);
         }else{
             if(foundUser){
-                if(foundUser.password === password){
-                    res.render("secrets");
-                }
+                bcrypt.compare(password, foundUser.password, function(err, result) {
+                    if(result === true){
+                        res.render("secrets");
+                    }
+                });     
             }
         }
     });
 });
 
 app.route("/register")
-
 .get(function(req,res){
     res.render("register");
 })
-.post(function(req,res){
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
-    });
 
-    newUser.save(function(err){
-        if(err){
-            console.log(err);
-        }else{
-            res.render("secrets");
+.post(function(req,res){
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        if(!err){
+            const newUser = new User({
+                email: req.body.username,
+                password: hash
+            });
+        
+            newUser.save(function(err){
+                if(err){
+                    console.log(err);
+                }else{
+                    res.render("secrets");
+                }
+            });
         }
     });
+   
 });
 
 
 app.get("/logout",function(req,res){
     res.redirect("/");
-})
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+});
 
 app.listen(2000,function(){
     console.log("Server running on 2000")
-})
+});
